@@ -36,7 +36,7 @@ def authenticate(username : str , password : str , session:Session):
 def create_access_token(data:dict , expiry_time : timedelta | None = None ):
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + (expiry_time or timedelta(minutes=15))
-    to_encode.update = ({'exp':expire})
+    to_encode.update({"exp":expire})
     return jwt.encode(to_encode , SECRET_KEY , algorithm=ALGORITHM)
 
 def get_current_user(token : str = Depends(oauth2_scheme) , session : Session = Depends(get_session)):

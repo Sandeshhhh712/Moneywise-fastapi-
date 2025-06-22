@@ -1,0 +1,6 @@
+fastapi[standard]
+passlib[bcrypt]
+pydantic
+sqlmodel
+python-jose
+pip install "bcrypt<4.0.0"

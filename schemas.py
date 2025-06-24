@@ -45,3 +45,28 @@ class TransactionRead(BaseModel):
     date_added : date
     optional_notes :  str | None = None
     
+class SavingsCreate(BaseModel):
+    amount : int
+    optional_notes : str | None = None
+
+class SavingsView(BaseModel):
+    id : int
+    amount : int
+    notes : str | None = None
+    created_at : date
+
+class SavingsUpdate(BaseModel):
+    amount : int
+    notes : str | None = None
+
+class GoalsCreate(BaseModel):
+    goal : str
+    amount : int
+
+class GoalsView(BaseModel):
+    id : int
+    goal : str
+    amount : int
+    completed : int | None = None
+    created_at : date
+

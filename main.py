@@ -8,8 +8,8 @@ from auth import authenticate , create_access_token , get_current_user , hash_pa
 from fastapi.security import OAuth2PasswordRequestForm
 
 #models and schemas
-from models import User , Category , Transaction
-from schemas import UserCreate , UserRead , Token , CategoryCreate , CategoryRead , TransactionCreate , TransactionRead , categoryinfo
+from models import User , Category , Transaction , Savings
+from schemas import UserCreate , UserRead , Token , CategoryCreate , CategoryRead , TransactionCreate , TransactionRead , categoryinfo , SavingsCreate , SavingsView , SavingsUpdate
 
 #database
 from database import get_session , create_db
@@ -18,6 +18,7 @@ class Tags(str , Enum):
     User = "User"
     Category = "Category"
     Transaction = "Transaction"
+    Savings = "Savings"
 
 app = FastAPI()
 
@@ -135,3 +136,51 @@ def delete_transaction(
     session.delete(transaction)
     session.commit()
     return {"detail": "Deleted"}
+
+
+@app.post("/savings/add" , response_model=SavingsView , tags=[Tags.Savings.value])
+def create_savings(savings:SavingsCreate , session:Session = Depends(get_session) , current_user: User = Depends(get_current_user)):
+    user = current_user.id
+    new_savings = Savings(user_id=user ,amount=savings.amount , optional_notes=savings.optional_notes )
+    session.add(new_savings)
+    session.commit()
+    session.refresh(new_savings)
+    return new_savings
+
+@app.get("/savings/all" , response_model=list[SavingsView] , tags=[Tags.Savings.value])
+def view_savings(session:Session = Depends(get_session) , current_user:User = Depends(get_current_user)):
+    user = current_user.id
+    savings_view = session.exec(select(Savings).where(Savings.user_id==user)).all()
+    return savings_view
+
+@app.get("/savings/get/{savings_id}" , response_model=SavingsView , tags=[Tags.Savings.value])
+def view_savings_single(savings_id: int ,session:Session = Depends(get_session) , current_user: User = Depends(get_current_user)):
+    user = current_user.i 
+    savings_view = session.get(Savings,savings_id)
+    return savings_view
+
+@app.delete("/savings/delete/{savings_id}" , tags=[Tags.Savings.value])
+def view_savings_single(savings_id: int ,session:Session = Depends(get_session) , current_user: User = Depends(get_current_user)):
+    user = current_user.id
+    savings = session.get(Savings , savings_id)
+
+    if savings is None:
+        raise HTTPException(status_code=404 , detail="Not Found")
+    if savings.user_id!=user:
+        raise HTTPException(status_code=403 , detail="Unauthorized")
+    
+    session.delete(savings)
+    session.commit()
+    return {"detail":"Deleted"}
+
+@app.patch("/savings/update/{savings_id}" , response_model=SavingsCreate , tags=[Tags.Savings.value])
+def update_savings(savings : SavingsUpdate , savings_id:int , session:Session = Depends(get_session) , current_user: User = Depends(get_current_user)):
+    savings_db = session.get(Savings , savings_id)
+    if savings_db is None:
+        raise HTTPException(status_code=404 , detail="Not Found")
+    savings_data = savings.model_dump(exclude_unset=True)
+    savings_db.sqlmodel_update(savings_data)
+    session.add(savings_db)
+    session.commit()
+    session.refresh(savings_db)
+    return savings_db

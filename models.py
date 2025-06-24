@@ -19,6 +19,8 @@ class User(SQLModel , table = True):
     password : str
     created_at : date = Field(default_factory=date.today)
 
+    goals : list['Goals'] = Relationship(back_populates="user")
+    savings : list['Savings'] = Relationship(back_populates="user")
     transactions : list['Transaction'] = Relationship(back_populates="user")
     category : list['Category'] = Relationship(back_populates="user")
 
@@ -47,6 +49,33 @@ class Transaction(SQLModel , table = True):
     user_id : int = Field(foreign_key="user.id")
     user : Optional["User"] = Relationship(back_populates = "transactions")
 
+class Savings(SQLModel , table= True):
+    id : Optional[int] = Field(default=None , primary_key=True)
+    amount : int 
+    optional_notes : str = Field(default=None)
+    created_at : date = Field(default_factory=date.today)
+
+    user_id : int = Field(foreign_key="user.id")
+    user : Optional["User"] = Relationship(back_populates="savings")
+
+    goals : list["Goals"] = Relationship(back_populates="savings")
+
+class Goals(SQLModel , table= True):
+    id : Optional[int] = Field(default=None , primary_key=True)
+    goal : str
+    amount : int
+    completed : int | None = Field(default=None)
+    created_at : date = Field(default_factory=date.today)
+
+    savings_id : int = Field(foreign_key="savings.id")
+    savings : Optional["Savings"] = Relationship(back_populates="goals")
+
+    user_id : int = Field(foreign_key="user.id")
+    user : Optional["User"] = Relationship(back_populates='goals')
+
+
+
+Savings.update_forward_refs()
 Transaction.update_forward_refs() # because model has been called before it had been made
 Category.update_forward_refs()
 User.update_forward_refs()

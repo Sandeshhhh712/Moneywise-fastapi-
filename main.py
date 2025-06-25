@@ -1,9 +1,10 @@
-from datetime import timedelta
-from fastapi import FastAPI , Depends ,HTTPException
+from datetime import date, datetime, timedelta
+from fastapi import FastAPI , Depends ,HTTPException, Query
 from sqlmodel import Session, select
 from enum import Enum
 from sqlalchemy.orm import selectinload
-from sqlalchemy import func
+from sqlalchemy import extract, func
+from calendar import month_name
 #authentication
 from auth import authenticate , create_access_token , get_current_user , hash_password , verify_hash_password , ACCESS_TOKEN_EXPIRY_MINUTES
 from fastapi.security import OAuth2PasswordRequestForm
@@ -20,6 +21,7 @@ class Tags(str , Enum):
     Category = "Category"
     Transaction = "Transaction"
     Savings = "Savings"
+    MonthlyReport = "Monthly Report"
 
 app = FastAPI()
 
@@ -138,7 +140,7 @@ def delete_transaction(
     session.commit()
     return {"detail": "Deleted"}
 
-
+#Savings add
 @app.post("/savings/add" , response_model=SavingsView , tags=[Tags.Savings.value])
 def create_savings(savings:SavingsCreate , session:Session = Depends(get_session) , current_user: User = Depends(get_current_user)):
     user = current_user.id
@@ -148,17 +150,23 @@ def create_savings(savings:SavingsCreate , session:Session = Depends(get_session
     session.refresh(new_savings)
     return new_savings
 
+#Savings history
+
 @app.get("/savings/all" , response_model=list[SavingsView] , tags=[Tags.Savings.value])
 def view_savings(session:Session = Depends(get_session) , current_user:User = Depends(get_current_user)):
     user = current_user.id
     savings_view = session.exec(select(Savings).where(Savings.user_id==user)).all()
     return savings_view
 
+#Savings get 1
+
 @app.get("/savings/get/{savings_id}" , response_model=SavingsView , tags=[Tags.Savings.value])
 def view_savings_single(savings_id: int ,session:Session = Depends(get_session) , current_user: User = Depends(get_current_user)):
     user = current_user.i 
     savings_view = session.get(Savings,savings_id)
     return savings_view
+
+#Savings Delete
 
 @app.delete("/savings/delete/{savings_id}" , tags=[Tags.Savings.value])
 def view_savings_single(savings_id: int ,session:Session = Depends(get_session) , current_user: User = Depends(get_current_user)):
@@ -174,6 +182,8 @@ def view_savings_single(savings_id: int ,session:Session = Depends(get_session) 
     session.commit()
     return {"detail":"Deleted"}
 
+#Savings update
+
 @app.patch("/savings/update/{savings_id}" , response_model=SavingsCreate , tags=[Tags.Savings.value])
 def update_savings(savings : SavingsUpdate , savings_id:int , session:Session = Depends(get_session) , current_user: User = Depends(get_current_user)):
     savings_db = session.get(Savings , savings_id)
@@ -186,9 +196,44 @@ def update_savings(savings : SavingsUpdate , savings_id:int , session:Session = 
     session.refresh(savings_db)
     return savings_db
 
+#Savings Total
+
 @app.get("/savings/totalamount" , tags=[Tags.Savings.value])
 def totalSavingsamount(session:Session = Depends(get_session) , current_user : User = Depends(get_current_user)):
     user = current_user.id
     savings = session.exec(select(func.sum(Savings.amount)).where(Savings.user_id == user)).one() or 0
     return {"user" : current_user.username , "savings":savings}
+
+
+#Monthly Report Endpoint
+
+@app.get("/monthlyreport" , tags=[Tags.MonthlyReport.value])
+def monthlyreport(month : int , session : Session = Depends(get_session) , current_user : User = Depends(get_current_user)):
+    user = current_user.id
+
+    statement = select(Transaction).where(Transaction.user_id == user ,extract("month" , Transaction.date_added) == month)
+    
+    transaction = session.exec(statement).all()
+    savings = session.exec(select(func.sum(Savings.amount)).where(Savings.user_id == user)).one() or 0
+    
+    income = sum(i.amount for i in transaction if i.type == "income")
+    expense = sum(i.amount for i in transaction if i.type == "expense")
+    
+    net = income -expense
+
+    category_summary = {}
+    for j in transaction:
+        if j.type == "expense":
+            category_name = j.category.name if j.category else "Uncategorized"
+            category_summary[category_name] = category_summary.get(category_name , 0) + j.amount # category ko naam ra value same iteration ma hunxa , so default 0 garera jun iteration ma xa tei iteration ko amount add gatr
+
+    return {
+        "User":current_user.username,
+        "Month" : month_name[month],
+        "income": income,
+        "expense":expense,
+        "total-savings": savings,
+        "Net transaction" : net,
+        "Categories" : category_summary
+    }
 

@@ -5,6 +5,10 @@ from enum import Enum
 from sqlalchemy.orm import selectinload
 from sqlalchemy import extract, func
 from calendar import month_name
+from weasyprint import HTML
+from io import BytesIO
+from fastapi.responses import StreamingResponse
+
 #authentication
 from auth import authenticate , create_access_token , get_current_user , hash_password , verify_hash_password , ACCESS_TOKEN_EXPIRY_MINUTES
 from fastapi.security import OAuth2PasswordRequestForm
@@ -236,4 +240,99 @@ def monthlyreport(month : int , session : Session = Depends(get_session) , curre
         "Net transaction" : net,
         "Categories" : category_summary
     }
+
+@app.get("/download/report" , tags=[Tags.MonthlyReport.value])
+def Download_monthly_report(
+    month : int , 
+    session : Session = Depends(get_session),
+    current_user : User = Depends(get_current_user)):
+
+    user = current_user.id
+
+    statement = select(Transaction).where(Transaction.user_id== user , extract("month" , Transaction.date_added)== month)
+
+    transactions = session.exec(statement).all()
+
+    #html content
+
+    html_content = f"""
+    <html>
+    <head>
+    <style>
+        body {{
+            font-family: Arial, sans-serif;
+            margin: 30px;
+        }}
+        h2 {{
+            text-align: center;
+            color: #2c3e50;
+        }}
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }}
+        th, td {{
+            border: 1px solid #ccc;
+            padding: 8px 12px;
+            text-align: left;
+        }}
+        th {{
+            background-color: #f5f5f5;
+        }}
+        tr:nth-child(even) {{
+            background-color: #f9f9f9;
+        }}
+        .summary {{
+            margin-top: 30px;
+            font-size: 1rem;
+            font-weight: bold;
+        }}
+    </style>
+    </head>
+    <body>
+    <h2>Monthly Report for {current_user.username} - Month {month}</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Amount</th>
+                <th>Category</th>
+                <th>Notes</th>
+            </tr>
+        </thead>
+        <tbody>
+    """
+
+# Loop through transactions
+    for t in transactions:
+        category = t.category.name if t.category else "Uncategorized"
+    html_content += f"""
+        <tr>
+            <td>{t.date_added}</td>
+            <td>{t.type}</td>
+            <td>{t.amount}</td>
+            <td>{category}</td>
+            <td>{t.optional_notes or ""}</td>
+        </tr>
+    """
+
+# Close table and body
+    html_content += """
+        </tbody>
+    </table>
+    </body>
+    </html>
+    """
+
+    pdf_io = BytesIO() #loads the file in memory
+    HTML(string=html_content).write_pdf(pdf_io) # convert from html to pdf
+    pdf_io.seek(0) # the pointer is at the last so reset the pointer to 0 for reading
+
+    return StreamingResponse(
+        pdf_io,
+        media_type="application/pdf",
+        headers={"Content-Disposition":f"attachment; filename=monthly_report_{month}{current_user.username}.pdf"} # these headers make the file downloadable instead of showing inline in browser
+    )
 

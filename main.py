@@ -252,6 +252,8 @@ def Download_monthly_report(
     statement = select(Transaction).where(Transaction.user_id== user , extract("month" , Transaction.date_added)== month)
 
     transactions = session.exec(statement).all()
+    savings = session.exec(
+    select(func.sum(Savings.amount)).where(Savings.user_id == user)).one() or 0
 
     #html content
 
@@ -308,20 +310,24 @@ def Download_monthly_report(
 # Loop through transactions
     for t in transactions:
         category = t.category.name if t.category else "Uncategorized"
-    html_content += f"""
-        <tr>
-            <td>{t.date_added}</td>
-            <td>{t.type}</td>
-            <td>{t.amount}</td>
-            <td>{category}</td>
-            <td>{t.optional_notes or ""}</td>
-        </tr>
-    """
-
+        html_content += f"""
+            <tr>
+                <td>{t.date_added}</td>
+                <td>{t.type.value}</td>
+                <td>{t.amount}</td>
+                <td>{category}</td>
+                <td>{t.optional_notes or ""}</td>
+            </tr>
+        """
+    
 # Close table and body
-    html_content += """
+    html_content += f"""
         </tbody>
     </table>
+    
+    
+      <div class="summary">
+        <p style="text-align: right;">💰 <strong>Total Savings:</strong> NPR {savings}</p>
     </body>
     </html>
     """

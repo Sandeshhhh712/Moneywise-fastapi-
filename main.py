@@ -254,8 +254,12 @@ def Download_monthly_report(
     transactions = session.exec(statement).all()
     savings = session.exec(
     select(func.sum(Savings.amount)).where(Savings.user_id == user)).one() or 0
+    income_transactions = [t for t in transactions if t.type.value == "income"]
+    expense_transactions = [t for t in transactions if t.type.value == "expense"]
 
-    #html content
+    total_income = sum(t.amount for t in income_transactions)
+    total_expense = sum(t.amount for t in expense_transactions)
+
 
     html_content = f"""
     <html>
@@ -268,6 +272,9 @@ def Download_monthly_report(
         h2 {{
             text-align: center;
             color: #2c3e50;
+        }}
+        h3 {{
+            color: #34495e;
         }}
         table {{
             width: 100%;
@@ -289,16 +296,18 @@ def Download_monthly_report(
             margin-top: 30px;
             font-size: 1rem;
             font-weight: bold;
+            text-align: right;
         }}
     </style>
     </head>
     <body>
     <h2>Monthly Report for {current_user.username} - Month {month}</h2>
+
+    <h3>Income</h3>
     <table>
         <thead>
             <tr>
                 <th>Date</th>
-                <th>Type</th>
                 <th>Amount</th>
                 <th>Category</th>
                 <th>Notes</th>
@@ -307,30 +316,61 @@ def Download_monthly_report(
         <tbody>
     """
 
-# Loop through transactions
-    for t in transactions:
+    # Income Table Rows
+    for t in income_transactions:
         category = t.category.name if t.category else "Uncategorized"
         html_content += f"""
             <tr>
                 <td>{t.date_added}</td>
-                <td>{t.type.value}</td>
                 <td>{t.amount}</td>
                 <td>{category}</td>
                 <td>{t.optional_notes or ""}</td>
             </tr>
         """
-    
-# Close table and body
+
     html_content += f"""
         </tbody>
     </table>
-    
-    
-      <div class="summary">
-        <p style="text-align: right;">💰 <strong>Total Savings:</strong> NPR {savings}</p>
+
+    <div class="summary"><strong>Total Income:</strong> NPR {total_income}</div>
+
+    <h3>Expenses</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Amount</th>
+                <th>Category</th>
+                <th>Notes</th>
+            </tr>
+        </thead>
+        <tbody>
+    """
+
+    # Expense Table Rows
+    for t in expense_transactions:
+        category = t.category.name if t.category else "Uncategorized"
+        html_content += f"""
+            <tr>
+                <td>{t.date_added}</td>
+                <td>{t.amount}</td>
+                <td>{category}</td>
+                <td>{t.optional_notes or ""}</td>
+            </tr>
+        """
+
+    html_content += f"""
+        </tbody>
+    </table>
+
+    <div class="summary"> <strong>Total Expenses:</strong> NPR {total_expense}</div>
+
+    <div class="summary"><strong>Total Savings:</strong> NPR {savings}</div>
+
     </body>
     </html>
     """
+
 
     pdf_io = BytesIO() #loads the file in memory
     HTML(string=html_content).write_pdf(pdf_io) # convert from html to pdf

@@ -3,13 +3,14 @@ from fastapi import FastAPI , Depends ,HTTPException
 from sqlmodel import Session, select
 from enum import Enum
 from sqlalchemy.orm import selectinload
+from sqlalchemy import func
 #authentication
 from auth import authenticate , create_access_token , get_current_user , hash_password , verify_hash_password , ACCESS_TOKEN_EXPIRY_MINUTES
 from fastapi.security import OAuth2PasswordRequestForm
 
 #models and schemas
 from models import User , Category , Transaction , Savings
-from schemas import UserCreate , UserRead , Token , CategoryCreate , CategoryRead , TransactionCreate , TransactionRead , categoryinfo , SavingsCreate , SavingsView , SavingsUpdate
+from schemas import UserCreate , UserRead , Token , CategoryCreate , CategoryRead , TransactionCreate , TransactionRead , categoryinfo , SavingsCreate , SavingsView , SavingsUpdate , SavingsTotal
 
 #database
 from database import get_session , create_db
@@ -184,3 +185,10 @@ def update_savings(savings : SavingsUpdate , savings_id:int , session:Session = 
     session.commit()
     session.refresh(savings_db)
     return savings_db
+
+@app.get("/savings/totalamount" , tags=[Tags.Savings.value])
+def totalSavingsamount(session:Session = Depends(get_session) , current_user : User = Depends(get_current_user)):
+    user = current_user.id
+    savings = session.exec(select(func.sum(Savings.amount)).where(Savings.user_id == user)).one() or 0
+    return {"user" : current_user.username , "savings":savings}
+

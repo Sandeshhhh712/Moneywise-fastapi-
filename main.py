@@ -15,7 +15,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 
 #models and schemas
 from models import User , Category , Transaction , Savings
-from schemas import UserCreate , UserRead , Token , CategoryCreate , CategoryRead , TransactionCreate , TransactionRead , categoryinfo , SavingsCreate , SavingsView , SavingsUpdate , SavingsTotal
+from schemas import UserCreate , UserRead , Token , CategoryCreate , CategoryRead , TransactionCreate , TransactionRead , categoryinfo , SavingsCreate , SavingsView , SavingsUpdate , SavingsTotal , RecurringCreate
 
 #database
 from database import get_session , create_db
@@ -26,6 +26,7 @@ class Tags(str , Enum):
     Transaction = "Transaction"
     Savings = "Savings"
     MonthlyReport = "Monthly Report"
+    RecurringTransaction = "Recurring Transaction"
 
 app = FastAPI()
 
@@ -216,9 +217,10 @@ def monthlyreport(month : int , session : Session = Depends(get_session) , curre
     user = current_user.id
 
     statement = select(Transaction).where(Transaction.user_id == user ,extract("month" , Transaction.date_added) == month)
+    savings_statement = select(func.sum(Savings.amount)).where(Savings.user_id == user , extract("month" , Savings.created_at)== month)
     
     transaction = session.exec(statement).all()
-    savings = session.exec(select(func.sum(Savings.amount)).where(Savings.user_id == user)).one() or 0
+    savings = session.exec(savings_statement).all()
     
     income = sum(i.amount for i in transaction if i.type == "income")
     expense = sum(i.amount for i in transaction if i.type == "expense")
@@ -250,10 +252,10 @@ def Download_monthly_report(
     user = current_user.id
 
     statement = select(Transaction).where(Transaction.user_id== user , extract("month" , Transaction.date_added)== month)
+    savings_statement = select(func.sum(Savings.amount)).where(Savings.user_id == user , extract("month" , Savings.created_at)== month)
 
     transactions = session.exec(statement).all()
-    savings = session.exec(
-    select(func.sum(Savings.amount)).where(Savings.user_id == user)).one() or 0
+    savings = session.exec(savings_statement).all()
     income_transactions = [t for t in transactions if t.type.value == "income"]
     expense_transactions = [t for t in transactions if t.type.value == "expense"]
 

@@ -59,14 +59,6 @@ class SavingsUpdate(BaseModel):
     amount : int
     notes : str | None = None
 
-class GoalsCreate(BaseModel):
-    goal : str
+class SavingsTotal(BaseModel):
+    user : str
     amount : int
-
-class GoalsView(BaseModel):
-    id : int
-    goal : str
-    amount : int
-    completed : int | None = None
-    created_at : date
-

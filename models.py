@@ -8,8 +8,9 @@ from enum import Enum
 
 
 class TransactionType(str , Enum):
-    income = "income"
     expense = "expense"
+    income = "income"
+    
 
 
 class User(SQLModel , table = True):
@@ -33,6 +34,7 @@ class Category(SQLModel , table=True):
 
     transactions : list["Transaction"] = Relationship(back_populates="category")
 
+
 class Transaction(SQLModel , table = True):
     id : Optional[int] = Field(default=None , primary_key=True)
     title : str = Field(index=True)
@@ -40,7 +42,7 @@ class Transaction(SQLModel , table = True):
     type : TransactionType = Field(default=TransactionType.expense)
 
     category_id : Optional[int] = Field(default=None , foreign_key="category.id")
-    category : Optional[Category] = Relationship(back_populates="transactions")
+    category : Optional["Category"] = Relationship(back_populates="transactions")
 
     date_added : date = Field(default_factory=date.today)
     optional_notes : str | None = Field(default=None)
@@ -56,7 +58,6 @@ class Savings(SQLModel , table= True):
 
     user_id : int = Field(foreign_key="user.id")
     user : Optional["User"] = Relationship(back_populates="savings")
-
 
 
 Savings.update_forward_refs()
